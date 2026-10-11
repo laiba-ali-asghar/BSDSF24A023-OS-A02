@@ -14,30 +14,51 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <pwd.h>
+#include <grp.h>
+#include <time.h>
 
 extern int errno;
 
-void do_ls(const char *dir);
+void do_ls(const char *dir, int long_flag);
+void print_long(const char *dir, const char *name);
+void mode_to_string(mode_t mode, char str[]);
 
-int main(int argc, char const *argv[])
+int main(int argc, char *argv[])
 {
-    if (argc == 1)
+    int opt;
+    int long_flag = 0;
+
+    while ((opt = getopt(argc, argv, "l")) != -1)
     {
-        do_ls(".");
+        switch (opt)
+        {
+        case 'l':
+            long_flag = 1;
+            break;
+        default:
+            fprintf(stderr, "Usage: %s [-l] [dir...]\n", argv[0]);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    if (optind == argc)
+    {
+        do_ls(".", long_flag);
     }
     else
     {
-        for (int i = 1; i < argc; i++)
+        for (int i = optind; i < argc; i++)
         {
             printf("Directory listing of %s : \n", argv[i]);
-            do_ls(argv[i]);
-	    puts("");
+            do_ls(argv[i], long_flag);
+            puts("");
         }
     }
     return 0;
 }
 
-void do_ls(const char *dir)
+void do_ls(const char *dir, int long_flag)
 {
     struct dirent *entry;
     DIR *dp = opendir(dir);
@@ -51,8 +72,10 @@ void do_ls(const char *dir)
     {
         if (entry->d_name[0] == '.')
             continue;
-        printf("%s\n", entry->d_name);
-    }
+        if (long_flag)
+            print_long(dir, entry->d_name);
+        else
+            printf("%s\n", entry->d_name);    }
 
     if (errno != 0)
     {
@@ -60,4 +83,61 @@ void do_ls(const char *dir)
     }
 
     closedir(dp);
+}
+
+void mode_to_string(mode_t mode, char str[])
+{
+    strcpy(str, "----------");
+
+    if (S_ISDIR(mode))       str[0] = 'd';
+    else if (S_ISLNK(mode))  str[0] = 'l';
+    else if (S_ISCHR(mode))  str[0] = 'c';
+    else if (S_ISBLK(mode))  str[0] = 'b';
+    else if (S_ISFIFO(mode)) str[0] = 'p';
+    else if (S_ISSOCK(mode)) str[0] = 's';
+
+    if (mode & S_IRUSR) str[1] = 'r';
+    if (mode & S_IWUSR) str[2] = 'w';
+    if (mode & S_IXUSR) str[3] = 'x';
+    if (mode & S_IRGRP) str[4] = 'r';
+    if (mode & S_IWGRP) str[5] = 'w';
+    if (mode & S_IXGRP) str[6] = 'x';
+    if (mode & S_IROTH) str[7] = 'r';
+    if (mode & S_IWOTH) str[8] = 'w';
+    if (mode & S_IXOTH) str[9] = 'x';
+
+    if (mode & S_ISUID) str[3] = (mode & S_IXUSR) ? 's' : 'S';
+    if (mode & S_ISGID) str[6] = (mode & S_IXGRP) ? 's' : 'S';
+    if (mode & S_ISVTX) str[9] = (mode & S_IXOTH) ? 't' : 'T';
+}
+
+void print_long(const char *dir, const char *name)
+{
+    char path[1024];
+    struct stat info;
+    char perms[11];
+
+    snprintf(path, sizeof(path), "%s/%s", dir, name);
+
+    if (lstat(path, &info) == -1)
+    {
+        perror(path);
+        return;
+    }
+
+    mode_to_string(info.st_mode, perms);
+
+    struct passwd *pw = getpwuid(info.st_uid);
+    struct group *gr = getgrgid(info.st_gid);
+
+    char *t = ctime(&info.st_mtime);
+
+    printf("%s %2ld %-8s %-8s %8ld %.12s %s\n",
+           perms,
+           (long)info.st_nlink,
+           pw ? pw->pw_name : "?",
+           gr ? gr->gr_name : "?",
+           (long)info.st_size,
+           t + 4,
+           name);
 }
