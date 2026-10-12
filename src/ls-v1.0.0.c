@@ -31,6 +31,7 @@ void mode_to_string(mode_t mode, char str[]);
 void print_columns(char **names, int count, int maxlen);
 int get_terminal_width(void);
 void print_horizontal(char **names, int count, int maxlen);
+int compare_names(const void *a, const void *b);
 
 int main(int argc, char *argv[])
 {
@@ -111,7 +112,7 @@ void do_ls(const char *dir, int mode)
     if (errno != 0)
         perror("readdir failed");
     closedir(dp);
-
+        qsort(names, count, sizeof(char *), compare_names);
        if (mode == MODE_LONG)
     {
         for (int i = 0; i < count; i++)
@@ -240,4 +241,10 @@ void print_horizontal(char **names, int count, int maxlen)
 
     if (count > 0)
         printf("\n");
+}
+int compare_names(const void *a, const void *b)
+{
+    const char *s1 = *(const char **)a;
+    const char *s2 = *(const char **)b;
+    return strcmp(s1, s2);
 }
