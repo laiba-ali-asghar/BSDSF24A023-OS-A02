@@ -105,3 +105,16 @@ There are three execute bits:
 Each is checked with bitwise AND. In my code, I combine them with OR and check whether any of them is set:
 
     if (mode & (S_IXUSR | S_IXGRP | S_IXOTH))   // executable → green
+    ## Feature 7: ls-v1.6.0 — Recursive Listing (-R)
+
+### Q1. What is a "base case" in recursion? What is the base case in your recursive ls?
+
+A base case is the condition where a recursive function stops calling itself. Without it, the function would call itself forever and crash.
+
+In my `ls -R`, recursion stops when a directory has no subdirectories: the loop finds no entry for which `S_ISDIR()` is true, so `do_ls()` makes no further calls and returns. The program also skips `.` and `..` (otherwise it would list the same folder forever or go back up), and uses `lstat()` so symbolic links to directories are not followed, which prevents infinite loops.
+
+### Q2. Why must you build a full path before the recursive call? What happens if you call do_ls("subdir")?
+
+`readdir()` only gives the entry's name (like `subdir`), not its location. Paths without a `/` at the start are looked up relative to the folder where the program was started, not the folder currently being listed.
+
+If `do_ls("parent_dir")` called `do_ls("subdir")`, the program would look for `subdir` in the starting folder instead of inside `parent_dir`. It would fail with "Cannot open directory", or list the wrong folder if one with the same name happened to exist there. Building the full path (`parent_dir/subdir`) with `snprintf()` makes sure the correct folder is opened at every level.
