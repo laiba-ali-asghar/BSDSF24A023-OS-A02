@@ -49,3 +49,16 @@ With a fixed width of 80:
 - On a wide terminal, space is wasted because fewer columns are printed than could fit.
 - On a narrow terminal (less than 80), lines become too long and wrap, which breaks the column alignment.
 - The output does not adjust when the user resizes the window.
+## Feature 4: ls-v1.3.0 — Horizontal Column Display (-x)
+
+### Q1. Compare the complexity of vertical and horizontal printing. Which needs more pre-calculation?
+
+Horizontal printing is simpler. It goes through the names in order and keeps track of the current position on the line. If the next name does not fit, it prints a newline and continues.
+
+Vertical ("down then across") printing needs more pre-calculation. Before printing anything, it must know the total number of files, the number of columns, and the number of rows, because it uses the formula `row + col * rows` to decide which item goes where. Horizontal printing only needs the column width and terminal width.
+
+### Q2. How does your program manage the different display modes?
+
+I used one integer variable `mode` with three constants: `MODE_DEFAULT`, `MODE_LONG`, and `MODE_HORIZONTAL`. It starts as `MODE_DEFAULT`. In the `getopt()` loop, `-l` sets it to `MODE_LONG` and `-x` sets it to `MODE_HORIZONTAL`.
+
+The mode is passed to `do_ls()`. After reading all filenames into the array, `do_ls()` uses an if/else chain: `MODE_LONG` calls `print_long()` for each file, `MODE_HORIZONTAL` calls `print_horizontal()`, and otherwise it calls `print_columns()`.
