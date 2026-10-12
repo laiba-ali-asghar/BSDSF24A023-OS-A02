@@ -83,3 +83,25 @@ For a directory with millions of files:
 It returns a negative number if the first item should come first, 0 if they are equal, and a positive number if the second should come first.
 
 The arguments are `const void *` because `qsort()` is generic and does not know the data type; `void *` can point to anything. Inside the function, I cast them to `const char **`, because each element in my array is a `char *` (a string), so a pointer to an element is a `char **`. Then I dereference to get the strings and compare them with `strcmp()`. `const` means the function does not change the data.
+## Feature 6: ls-v1.5.0 — Colorized Output
+
+### Q1. How do ANSI escape codes produce color? Show the code for green text.
+
+ANSI escape codes are special character sequences that the terminal treats as instructions instead of printing them. They start with the escape character `\033`, followed by `[`, one or more numbers, and `m`. The numbers choose the style or color (for example, 31 is red, 32 is green, 34 is blue). The code `\033[0m` resets back to normal.
+
+To print text in green:
+
+    printf("\033[0;32mHello\033[0m\n");
+
+`\033[0;32m` turns on green, `Hello` is printed in green, and `\033[0m` resets the color.
+
+### Q2. Which bits in st_mode show whether a file is executable by owner, group, or others?
+
+There are three execute bits:
+- `S_IXUSR`: executable by the owner
+- `S_IXGRP`: executable by the group
+- `S_IXOTH`: executable by others
+
+Each is checked with bitwise AND. In my code, I combine them with OR and check whether any of them is set:
+
+    if (mode & (S_IXUSR | S_IXGRP | S_IXOTH))   // executable → green
