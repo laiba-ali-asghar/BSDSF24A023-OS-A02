@@ -62,3 +62,24 @@ Vertical ("down then across") printing needs more pre-calculation. Before printi
 I used one integer variable `mode` with three constants: `MODE_DEFAULT`, `MODE_LONG`, and `MODE_HORIZONTAL`. It starts as `MODE_DEFAULT`. In the `getopt()` loop, `-l` sets it to `MODE_LONG` and `-x` sets it to `MODE_HORIZONTAL`.
 
 The mode is passed to `do_ls()`. After reading all filenames into the array, `do_ls()` uses an if/else chain: `MODE_LONG` calls `print_long()` for each file, `MODE_HORIZONTAL` calls `print_horizontal()`, and otherwise it calls `print_columns()`.
+
+## Feature 5: ls-v1.4.0 — Alphabetical Sort
+
+### Q1. Why must all entries be read into memory before sorting? What are the drawbacks for very large directories?
+
+`readdir()` returns entries one at a time in no particular order. To sort, the program must compare every name with the others, so all names must be available at the same time. That is why they are stored in a dynamic array first and sorted with `qsort()` before printing.
+
+For a directory with millions of files:
+- It uses a lot of memory, because every name is stored at once.
+- Nothing is printed until all entries are read and sorted, so the user waits longer.
+- The array has to be resized many times with `realloc()`, which takes extra time.
+
+### Q2. Explain the purpose and signature of the comparison function for qsort(). Why must it take const void * arguments?
+
+`qsort()` can sort any type of data, so it needs a comparison function to tell it how to compare two items. My function is:
+
+    int compare_names(const void *a, const void *b)
+
+It returns a negative number if the first item should come first, 0 if they are equal, and a positive number if the second should come first.
+
+The arguments are `const void *` because `qsort()` is generic and does not know the data type; `void *` can point to anything. Inside the function, I cast them to `const char **`, because each element in my array is a `char *` (a string), so a pointer to an element is a `char **`. Then I dereference to get the strings and compare them with `strcmp()`. `const` means the function does not change the data.
