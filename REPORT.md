@@ -30,3 +30,22 @@ If the result is non-zero, the permission is present. The same is done with `S_I
     if ((mode & S_IFMT) == S_IFDIR)   // directory
 
 The macro `S_ISDIR(mode)` does the same check more simply, which is what my code uses (similarly `S_ISLNK()` for links).
+
+## Feature 3: ls-v1.2.0 — Column Display (Down Then Across)
+
+### Q1. Explain the logic for "down then across" printing. Why is a single loop insufficient?
+
+First, all filenames are read into an array and the longest name is found. The number of columns is calculated as `terminal_width / (longest_name + 2)`, and the number of rows as `count / columns` rounded up.
+
+Then the output is printed row by row. In each row, the program prints one item from each column using the index `row + col * rows`. For example, row 0 prints items 0, rows, 2*rows, and so on.
+
+A single loop prints items in order (0, 1, 2, 3...) from left to right, which gives an "across" layout. In "down then across", items that are next to each other in the array must appear one below the other, so the program has to jump through the array using the formula. It also needs the total count and number of rows before printing anything, which a single loop does not know.
+
+### Q2. What is the purpose of ioctl here? What are the limitations of a fixed 80-column width?
+
+`ioctl()` with the `TIOCGWINSZ` request asks the terminal for its current size. `ws_col` gives the width in characters, so the program can fit as many columns as the screen allows.
+
+With a fixed width of 80:
+- On a wide terminal, space is wasted because fewer columns are printed than could fit.
+- On a narrow terminal (less than 80), lines become too long and wrap, which breaks the column alignment.
+- The output does not adjust when the user resizes the window.
