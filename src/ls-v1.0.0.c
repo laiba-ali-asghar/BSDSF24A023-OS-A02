@@ -22,16 +22,24 @@
 #define MODE_DEFAULT    0
 #define MODE_LONG       1
 #define MODE_HORIZONTAL 2
+#define COLOR_RESET   "\033[0m"
+#define COLOR_BLUE    "\033[0;34m"
+#define COLOR_GREEN   "\033[0;32m"
+#define COLOR_RED     "\033[0;31m"
+#define COLOR_PINK    "\033[0;35m"
+#define COLOR_REVERSE "\033[7m"
 
 extern int errno;
 
 void do_ls(const char *dir, int mode);
 void print_long(const char *dir, const char *name);
 void mode_to_string(mode_t mode, char str[]);
-void print_columns(char **names, int count, int maxlen);
 int get_terminal_width(void);
-void print_horizontal(char **names, int count, int maxlen);
 int compare_names(const void *a, const void *b);
+void print_columns(const char *dir, char **names, int count, int maxlen);
+void print_horizontal(const char *dir, char **names, int count, int maxlen);
+void print_colored(const char *name, mode_t mode);
+mode_t get_mode(const char *dir, const char *name);
 
 int main(int argc, char *argv[])
 {
@@ -120,12 +128,10 @@ void do_ls(const char *dir, int mode)
     }
     else if (mode == MODE_HORIZONTAL)
     {
-        print_horizontal(names, count, maxlen);
-    }
+        print_horizontal(dir, names, count, maxlen);    }
     else
     {
-        print_columns(names, count, maxlen);
-    }
+        print_columns(dir, names, count, maxlen);    }
 
     for (int i = 0; i < count; i++)
         free(names[i]);
@@ -178,14 +184,15 @@ void print_long(const char *dir, const char *name)
 
     char *t = ctime(&info.st_mtime);
 
-    printf("%s %2ld %-8s %-8s %8ld %.12s %s\n",
+       printf("%s %2ld %-8s %-8s %8ld %.12s ",
            perms,
            (long)info.st_nlink,
            pw ? pw->pw_name : "?",
            gr ? gr->gr_name : "?",
            (long)info.st_size,
-           t + 4,
-           name);
+           t + 4);
+    print_colored(name, info.st_mode);
+    printf("\n");
 }
 int get_terminal_width(void)
 {
@@ -195,7 +202,7 @@ int get_terminal_width(void)
     return w.ws_col;
 }
 
-void print_columns(char **names, int count, int maxlen)
+void print_columns(const char *dir, char **names, int count, int maxlen)
 {
     if (count == 0)
         return;
@@ -216,13 +223,14 @@ void print_columns(char **names, int count, int maxlen)
             int i = r + c * rows;
             if (i >= count)
                 break;
-            printf("%-*s", col_width, names[i]);
+            print_colored(names[i], get_mode(dir, names[i]));
+            printf("%*s", col_width - (int)strlen(names[i]), "");
         }
         printf("\n");
     }
 }
 
-void print_horizontal(char **names, int count, int maxlen)
+void print_horizontal(const char *dir, char **names, int count, int maxlen)
 {
     int width = get_terminal_width();
     int col_width = maxlen + 2;
@@ -235,7 +243,8 @@ void print_horizontal(char **names, int count, int maxlen)
             printf("\n");
             pos = 0;
         }
-        printf("%-*s", col_width, names[i]);
+        print_colored(names[i], get_mode(dir, names[i]));
+        printf("%*s", col_width - (int)strlen(names[i]), "");
         pos += col_width;
     }
 
@@ -247,4 +256,35 @@ int compare_names(const void *a, const void *b)
     const char *s1 = *(const char **)a;
     const char *s2 = *(const char **)b;
     return strcmp(s1, s2);
+}
+mode_t get_mode(const char *dir, const char *name)
+{
+    char path[1024];
+    struct stat info;
+
+    snprintf(path, sizeof(path), "%s/%s", dir, name);
+    if (lstat(path, &info) == -1)
+        return 0;
+    return info.st_mode;
+}
+
+void print_colored(const char *name, mode_t mode)
+{
+    const char *color = NULL;
+
+    if (S_ISLNK(mode))
+        color = COLOR_PINK;
+    else if (S_ISDIR(mode))
+        color = COLOR_BLUE;
+    else if (S_ISCHR(mode) || S_ISBLK(mode) || S_ISSOCK(mode) || S_ISFIFO(mode))
+        color = COLOR_REVERSE;
+    else if (strstr(name, ".tar") || strstr(name, ".gz") || strstr(name, ".zip"))
+        color = COLOR_RED;
+    else if (mode & (S_IXUSR | S_IXGRP | S_IXOTH))
+        color = COLOR_GREEN;
+
+    if (color)
+        printf("%s%s%s", color, name, COLOR_RESET);
+    else
+        printf("%s", name);
 }
