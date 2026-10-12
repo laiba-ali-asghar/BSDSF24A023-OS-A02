@@ -19,49 +19,57 @@
 #include <grp.h>
 #include <time.h>
 
+#define MODE_DEFAULT    0
+#define MODE_LONG       1
+#define MODE_HORIZONTAL 2
+
 extern int errno;
 
-void do_ls(const char *dir, int long_flag);
+void do_ls(const char *dir, int mode);
 void print_long(const char *dir, const char *name);
 void mode_to_string(mode_t mode, char str[]);
 void print_columns(char **names, int count, int maxlen);
 int get_terminal_width(void);
+void print_horizontal(char **names, int count, int maxlen);
 
 int main(int argc, char *argv[])
 {
     int opt;
-    int long_flag = 0;
+    int mode = MODE_DEFAULT;
 
-    while ((opt = getopt(argc, argv, "l")) != -1)
+    while ((opt = getopt(argc, argv, "lx")) != -1)
     {
         switch (opt)
         {
         case 'l':
-            long_flag = 1;
+            mode = MODE_LONG;
+            break;
+        case 'x':
+            mode = MODE_HORIZONTAL;
             break;
         default:
-            fprintf(stderr, "Usage: %s [-l] [dir...]\n", argv[0]);
+            fprintf(stderr, "Usage: %s [-l] [-x] [dir...]\n", argv[0]);
             exit(EXIT_FAILURE);
         }
     }
 
     if (optind == argc)
     {
-        do_ls(".", long_flag);
+        do_ls(".", mode);
     }
     else
     {
         for (int i = optind; i < argc; i++)
         {
             printf("Directory listing of %s : \n", argv[i]);
-            do_ls(argv[i], long_flag);
+            do_ls(argv[i], mode);
             puts("");
         }
     }
     return 0;
 }
 
-void do_ls(const char *dir, int long_flag)
+void do_ls(const char *dir, int mode)
 {
     struct dirent *entry;
     DIR *dp = opendir(dir);
@@ -104,10 +112,14 @@ void do_ls(const char *dir, int long_flag)
         perror("readdir failed");
     closedir(dp);
 
-    if (long_flag)
+       if (mode == MODE_LONG)
     {
         for (int i = 0; i < count; i++)
             print_long(dir, names[i]);
+    }
+    else if (mode == MODE_HORIZONTAL)
+    {
+        print_horizontal(names, count, maxlen);
     }
     else
     {
@@ -207,4 +219,25 @@ void print_columns(char **names, int count, int maxlen)
         }
         printf("\n");
     }
+}
+
+void print_horizontal(char **names, int count, int maxlen)
+{
+    int width = get_terminal_width();
+    int col_width = maxlen + 2;
+    int pos = 0;
+
+    for (int i = 0; i < count; i++)
+    {
+        if (pos + col_width > width && pos > 0)
+        {
+            printf("\n");
+            pos = 0;
+        }
+        printf("%-*s", col_width, names[i]);
+        pos += col_width;
+    }
+
+    if (count > 0)
+        printf("\n");
 }
